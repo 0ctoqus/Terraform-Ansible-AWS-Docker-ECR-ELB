@@ -1,0 +1,163 @@
+# Ansible playbook AWS - install docker
+---
+- name: "AWS - Install docker"
+  hosts: all
+  vars:
+    ecr_repository_url: "{{ ecr_repository_url }}"
+  ignore_unreachable: yes
+  become: yes
+  tasks:
+    - name: Update all packages
+      yum:
+        name: '*'
+        state: latest
+        update_only: yes
+
+    - name: Ensure a list of yum packages are installed
+      yum:
+        name: "{{ packages }}"
+        state: latest
+        update_cache: yes
+      vars:
+        packages:
+        - python-pip
+        - yum-utils
+        - device-mapper-persistent-data
+        - lvm2
+        - amazon-linux-extras
+        - gcc
+        - amazon-ecr-credential-helper
+        - git
+
+    - name: Add extras repository
+      shell: yum-config-manager --enable extras
+
+    - name: Install docker-ce (centos) via amazon-linux-extras packages
+      shell: "amazon-linux-extras install docker -y"
+
+    - name: Enable Docker CE service at startup
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Download and install docker compose
+      shell: "sudo curl -L https://github.com/docker/compose/releases/download/1.27.4/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose"
+
+    - name: Fix docker composer permissions after download
+      shell: "sudo chmod +x /usr/local/bin/docker-compose"
+
+    - name: Ensure Python pip packages are installed
+      pip:
+        name: "{{ packages }}"
+        extra_args: --user
+        executable: pip
+      vars:
+        packages:
+        - cryptography
+        - boto
+        - boto3
+        - docker
+        - docker-compose
+  
+    - name: Creates docker cred directory
+      file:
+        path: /home/ec2-user/.docker/
+        state: directory
+
+    - name: Copy docker config cred file
+      ansible.builtin.copy:
+        src: config.json
+        dest: /home/ec2-user/.docker/config.json
+        owner: ec2-user
+        mode: '0644'
+
+    - name: Creates aws credentials directory
+      file:
+        path: /home/ec2-user/.aws
+        state: directory
+
+    - name: Copy aws config cred file
+      ansible.builtin.copy:
+        src: credentials
+        dest: /home/ec2-user/.aws/credentials
+        owner: ec2-user
+        mode: '0644'
+
+    - name: Add user to docker group
+      user:
+        name: ec2-user
+        groups: docker
+        append: yes
+      become: yes
+
+    #we should restart the session and not do that
+    - name: Set the rights for docker socket
+      command: sudo chmod 666 /var/run/docker.sock
+
+    - name: Copy the docker-compose file
+      ansible.builtin.copy:
+        src: ../docker/docker-compose.yml
+        dest: /home/ec2-user/docker-compose.yml
+        owner: ec2-user
+        mode: '0644'
+
+    - name: Copy the docker .env file
+      ansible.builtin.copy:
+        src: ../docker/.env
+        dest: /home/ec2-user/.env
+        owner: ec2-user
+        mode: '0644'
+
+    - name: Creates data file directory
+      file:
+        path: /home/ec2-user/db/data
+        state: directory
+        owner: ec2-user
+        group: ec2-user
+        mode: 0775
+        recurse: yes
+
+    - name: Copy the data file
+      ansible.builtin.copy:
+        src: ../docker/db/data/adult.data
+        dest: /home/ec2-user/db/data/adult.data
+        owner: ec2-user
+        mode: '0644'
+
+    - name: Copy the init.sql file
+      ansible.builtin.copy:
+        src: ../docker/db/init.sql
+        dest: /home/ec2-user/db/init.sql
+        owner: ec2-user
+        mode: '0644'
+
+    - name: Pull Iktos docker image
+      command: "docker-compose pull"
+      become: true
+      become_user: ec2-user
+
+    - name: Run Iktos docker image
+      command: "docker-compose up --no-build --detach"
+      become: true
+      become_user: ec2-user
+
+    - name: Find my public ip
+      uri: 
+        url: http://ifconfig.me/ip
+        return_content: yes
+      register: ip_response
+
+    - name: Check that you can connect (GET) to a page and it returns a status 200
+      uri:
+        url: "http://{{ ip_response.content }}{{ item }}"
+        return_content: yes
+      loop:
+        - "/"
+        - "/api/v1/first_row"
+        - "/api/v1/mean_value?column_name=age"
+        - "/api/v1/most_frequentvalue?column_name=age"
+      register: _result
+      until: _result.status == 200
+      retries: 24 # 24 * 5 seconds = 2min (24*5/60=2)
+      delay: 5

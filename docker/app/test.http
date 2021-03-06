@@ -1,0 +1,10 @@
+GET http://0.0.0.0:5000/ HTTP/1.1
+
+###
+GET http://0.0.0.0:5000/api/v1/first_row HTTP/1.1
+
+###
+GET http://0.0.0.0:5000/api/v1/mean_value?column_name=age HTTP/1.1
+
+###
+GET http://0.0.0.0:5000/api/v1/most_frequentvalue?column_name=age HTTP/1.1
