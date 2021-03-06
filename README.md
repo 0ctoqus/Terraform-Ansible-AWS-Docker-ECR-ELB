@@ -2,7 +2,7 @@
 Python API and DB dockerised and deployed to AWS instances with an elastic load balancer using Terraform and Ansible.
 
 ## Current architecture
-![Current architecture of the project generated using app.diagrams.net](docs/iktos-test-diagram.png?raw=true)
+![Current architecture of the project generated using app.diagrams.net](docs/Iktos-test-diagram.png?raw=true)
 
 In the current architecture we use Terraform to provide two EC2 instances running Amazon Linux 2 with a docker container running a basic web API.
 The two instances are run inside an elastic load balancer and the docker image is provided by the elastic container registry.
