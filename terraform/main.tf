@@ -87,14 +87,6 @@ EOF
   }
 }
 
-#output "ecr_user_id" {
-#  value = aws_iam_access_key.ecr_user.id
-#}
-#
-#output "ecr_user_secret" {
-#  value = aws_iam_access_key.ecr_user.secret
-#}
-
 ###########################################################
 # Create the ECR repository and push the docker image to it
 ###########################################################
